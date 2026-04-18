@@ -54,11 +54,12 @@
     background: #f1f5f9; border-radius: 16px; padding: 20px 0; margin-bottom: 20px;
     font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
   }
-  .choices { display: grid; gap: 10px; }
+  .choices { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
   .choice-btn {
-    padding: 14px; border: 3px solid #cbd5e1; background: #fff; border-radius: 14px;
-    font-size: 17px; font-weight: bold; cursor: pointer;
-    color: #1e293b; text-align: left; transition: all 0.15s; font-family: inherit;
+    padding: 14px 10px; border: 3px solid #cbd5e1; background: #fff; border-radius: 14px;
+    font-size: 16px; font-weight: bold; cursor: pointer;
+    color: #1e293b; text-align: center; transition: all 0.15s; font-family: inherit;
+    min-height: 70px; display: flex; flex-direction: column; justify-content: center;
   }
   .choice-btn:hover { border-color: #3b82f6; background: #eff6ff; }
   .choice-btn:active { transform: scale(0.98); }
@@ -101,8 +102,9 @@
     overflow: hidden;
     border: 3px solid #1e3a8a;
     background: #e0f2fe;
+    position: relative;
   }
-  #map { width: 100%; height: 280px; }
+  #map { width: 100%; height: 320px; }
   .map-info {
     background: #1e3a8a; color: #fff; padding: 8px 12px;
     font-size: 13px; text-align: center;
@@ -117,6 +119,13 @@
     font-family: inherit; font-size: 13px;
   }
   .map-tab.active { background: #1e3a8a; color: #fff; }
+  .map-loading {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255,255,255,0.9); padding: 10px 16px;
+    border-radius: 10px; font-size: 14px; color: #475569;
+    z-index: 1000;
+  }
 
   .next-btn {
     display: block; width: 100%; padding: 14px; margin-top: 12px;
@@ -125,6 +134,14 @@
     cursor: pointer; box-shadow: 0 4px 0 #0f172a; font-family: inherit;
   }
   .next-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0f172a; }
+
+  .quit-btn {
+    display: block; width: 100%; padding: 10px; margin-top: 8px;
+    background: #fff; color: #64748b; border: 2px solid #cbd5e1;
+    border-radius: 10px; font-size: 14px; font-weight: bold;
+    cursor: pointer; font-family: inherit;
+  }
+  .quit-btn:active { background: #f1f5f9; }
 
   .result { text-align: center; }
   .result h2 { color: #1e3a8a; font-size: 24px; margin-bottom: 12px; }
@@ -141,9 +158,9 @@
   }
   .learned-item:last-child { border-bottom: none; }
 
-  .flag-marker {
-    font-size: 32px; text-align: center; line-height: 1;
-    text-shadow: 0 0 8px #fff, 0 0 4px #fff;
+  .flag-label {
+    font-size: 28px; text-align: center; line-height: 1;
+    text-shadow: 0 0 8px #fff, 0 0 4px #fff, 0 2px 4px rgba(0,0,0,0.3);
     background: transparent !important; border: none !important;
   }
 </style>
@@ -155,53 +172,73 @@
 </div>
 
 <script>
+// ISO 3166-1 alpha-3 コード付き
 const COUNTRIES = [
-  { flag: '🇯🇵', name: '日本',         yomi: 'にほん',           region: 'アジア',     level: 1, lat: 36.2, lng: 138.3 },
-  { flag: '🇰🇷', name: '韓国',         yomi: 'かんこく',         region: 'アジア',     level: 1, lat: 35.9, lng: 127.8 },
-  { flag: '🇨🇳', name: '中国',         yomi: 'ちゅうごく',       region: 'アジア',     level: 1, lat: 35.9, lng: 104.2 },
-  { flag: '🇲🇾', name: 'マレーシア',   yomi: 'まれーしあ',       region: 'アジア',     level: 1, lat: 4.2, lng: 101.9 },
-  { flag: '🇸🇬', name: 'シンガポール', yomi: 'しんがぽーる',     region: 'アジア',     level: 2, lat: 1.35, lng: 103.8 },
-  { flag: '🇹🇭', name: 'タイ',         yomi: 'たい',             region: 'アジア',     level: 2, lat: 15.9, lng: 101.0 },
-  { flag: '🇮🇳', name: 'インド',       yomi: 'いんど',           region: 'アジア',     level: 1, lat: 20.6, lng: 78.9 },
-  { flag: '🇮🇩', name: 'インドネシア', yomi: 'いんどねしあ',     region: 'アジア',     level: 2, lat: -0.8, lng: 113.9 },
-  { flag: '🇻🇳', name: 'ベトナム',     yomi: 'べとなむ',         region: 'アジア',     level: 2, lat: 14.1, lng: 108.3 },
-  { flag: '🇵🇭', name: 'フィリピン',   yomi: 'ふぃりぴん',       region: 'アジア',     level: 2, lat: 12.9, lng: 121.8 },
-  { flag: '🇬🇧', name: 'イギリス',     yomi: 'いぎりす',         region: 'ヨーロッパ', level: 1, lat: 55.4, lng: -3.4 },
-  { flag: '🇫🇷', name: 'フランス',     yomi: 'ふらんす',         region: 'ヨーロッパ', level: 1, lat: 46.2, lng: 2.2 },
-  { flag: '🇩🇪', name: 'ドイツ',       yomi: 'どいつ',           region: 'ヨーロッパ', level: 1, lat: 51.2, lng: 10.5 },
-  { flag: '🇮🇹', name: 'イタリア',     yomi: 'いたりあ',         region: 'ヨーロッパ', level: 1, lat: 41.9, lng: 12.6 },
-  { flag: '🇪🇸', name: 'スペイン',     yomi: 'すぺいん',         region: 'ヨーロッパ', level: 1, lat: 40.5, lng: -3.7 },
-  { flag: '🇵🇹', name: 'ポルトガル',   yomi: 'ぽるとがる',       region: 'ヨーロッパ', level: 2, lat: 39.4, lng: -8.2 },
-  { flag: '🇨🇭', name: 'スイス',       yomi: 'すいす',           region: 'ヨーロッパ', level: 2, lat: 46.8, lng: 8.2 },
-  { flag: '🇳🇱', name: 'オランダ',     yomi: 'おらんだ',         region: 'ヨーロッパ', level: 2, lat: 52.1, lng: 5.3 },
-  { flag: '🇸🇪', name: 'スウェーデン', yomi: 'すうぇーでん',     region: 'ヨーロッパ', level: 2, lat: 60.1, lng: 18.6 },
-  { flag: '🇳🇴', name: 'ノルウェー',   yomi: 'のるうぇー',       region: 'ヨーロッパ', level: 2, lat: 60.5, lng: 8.5 },
-  { flag: '🇫🇮', name: 'フィンランド', yomi: 'ふぃんらんど',     region: 'ヨーロッパ', level: 2, lat: 61.9, lng: 25.7 },
-  { flag: '🇩🇰', name: 'デンマーク',   yomi: 'でんまーく',       region: 'ヨーロッパ', level: 2, lat: 56.3, lng: 9.5 },
-  { flag: '🇷🇺', name: 'ロシア',       yomi: 'ろしあ',           region: 'ヨーロッパ', level: 1, lat: 61.5, lng: 105.3 },
-  { flag: '🇬🇷', name: 'ギリシャ',     yomi: 'ぎりしゃ',         region: 'ヨーロッパ', level: 2, lat: 39.1, lng: 21.8 },
-  { flag: '🇹🇷', name: 'トルコ',       yomi: 'とるこ',           region: 'ヨーロッパ', level: 2, lat: 38.9, lng: 35.2 },
-  { flag: '🇵🇱', name: 'ポーランド',   yomi: 'ぽーらんど',       region: 'ヨーロッパ', level: 3, lat: 51.9, lng: 19.1 },
-  { flag: '🇺🇦', name: 'ウクライナ',   yomi: 'うくらいな',       region: 'ヨーロッパ', level: 2, lat: 48.4, lng: 31.2 },
-  { flag: '🇺🇸', name: 'アメリカ',     yomi: 'あめりか',         region: '北アメリカ', level: 1, lat: 39.8, lng: -98.6 },
-  { flag: '🇨🇦', name: 'カナダ',       yomi: 'かなだ',           region: '北アメリカ', level: 1, lat: 56.1, lng: -106.3 },
-  { flag: '🇲🇽', name: 'メキシコ',     yomi: 'めきしこ',         region: '北アメリカ', level: 2, lat: 23.6, lng: -102.5 },
-  { flag: '🇧🇷', name: 'ブラジル',     yomi: 'ぶらじる',         region: '南アメリカ', level: 1, lat: -14.2, lng: -51.9 },
-  { flag: '🇦🇷', name: 'アルゼンチン', yomi: 'あるぜんちん',     region: '南アメリカ', level: 2, lat: -38.4, lng: -63.6 },
-  { flag: '🇨🇱', name: 'チリ',         yomi: 'ちり',             region: '南アメリカ', level: 3, lat: -35.7, lng: -71.5 },
-  { flag: '🇵🇪', name: 'ペルー',       yomi: 'ぺるー',           region: '南アメリカ', level: 3, lat: -9.2, lng: -75.0 },
-  { flag: '🇦🇺', name: 'オーストラリア', yomi: 'おーすとらりあ', region: 'オセアニア', level: 1, lat: -25.3, lng: 133.8 },
-  { flag: '🇳🇿', name: 'ニュージーランド', yomi: 'にゅーじーらんど', region: 'オセアニア', level: 2, lat: -40.9, lng: 174.9 },
-  { flag: '🇪🇬', name: 'エジプト',     yomi: 'えじぷと',         region: 'アフリカ',   level: 1, lat: 26.8, lng: 30.8 },
-  { flag: '🇿🇦', name: '南アフリカ',   yomi: 'みなみあふりか',   region: 'アフリカ',   level: 2, lat: -30.6, lng: 22.9 },
-  { flag: '🇰🇪', name: 'ケニア',       yomi: 'けにあ',           region: 'アフリカ',   level: 3, lat: -0.02, lng: 37.9 },
-  { flag: '🇲🇦', name: 'モロッコ',     yomi: 'もろっこ',         region: 'アフリカ',   level: 3, lat: 31.8, lng: -7.1 },
-  { flag: '🇳🇬', name: 'ナイジェリア', yomi: 'ないじぇりあ',     region: 'アフリカ',   level: 3, lat: 9.1, lng: 8.7 },
-  { flag: '🇸🇦', name: 'サウジアラビア', yomi: 'さうじあらびあ', region: '中東',       level: 2, lat: 23.9, lng: 45.1 },
-  { flag: '🇦🇪', name: 'アラブ首長国連邦', yomi: 'あらぶしゅちょうこくれんぽう', region: '中東', level: 3, lat: 23.4, lng: 53.8 },
-  { flag: '🇮🇱', name: 'イスラエル',   yomi: 'いすらえる',       region: '中東',       level: 3, lat: 31.0, lng: 34.9 },
-  { flag: '🇮🇷', name: 'イラン',       yomi: 'いらん',           region: '中東',       level: 3, lat: 32.4, lng: 53.7 },
+  { flag: '🇯🇵', name: '日本',         yomi: 'にほん',           region: 'アジア',     level: 1, lat: 36.2, lng: 138.3, iso: 'JPN' },
+  { flag: '🇰🇷', name: '韓国',         yomi: 'かんこく',         region: 'アジア',     level: 1, lat: 35.9, lng: 127.8, iso: 'KOR' },
+  { flag: '🇨🇳', name: '中国',         yomi: 'ちゅうごく',       region: 'アジア',     level: 1, lat: 35.9, lng: 104.2, iso: 'CHN' },
+  { flag: '🇲🇾', name: 'マレーシア',   yomi: 'まれーしあ',       region: 'アジア',     level: 1, lat: 4.2, lng: 101.9, iso: 'MYS' },
+  { flag: '🇸🇬', name: 'シンガポール', yomi: 'しんがぽーる',     region: 'アジア',     level: 2, lat: 1.35, lng: 103.8, iso: 'SGP' },
+  { flag: '🇹🇭', name: 'タイ',         yomi: 'たい',             region: 'アジア',     level: 2, lat: 15.9, lng: 101.0, iso: 'THA' },
+  { flag: '🇮🇳', name: 'インド',       yomi: 'いんど',           region: 'アジア',     level: 1, lat: 20.6, lng: 78.9, iso: 'IND' },
+  { flag: '🇮🇩', name: 'インドネシア', yomi: 'いんどねしあ',     region: 'アジア',     level: 2, lat: -0.8, lng: 113.9, iso: 'IDN' },
+  { flag: '🇻🇳', name: 'ベトナム',     yomi: 'べとなむ',         region: 'アジア',     level: 2, lat: 14.1, lng: 108.3, iso: 'VNM' },
+  { flag: '🇵🇭', name: 'フィリピン',   yomi: 'ふぃりぴん',       region: 'アジア',     level: 2, lat: 12.9, lng: 121.8, iso: 'PHL' },
+  { flag: '🇬🇧', name: 'イギリス',     yomi: 'いぎりす',         region: 'ヨーロッパ', level: 1, lat: 55.4, lng: -3.4, iso: 'GBR' },
+  { flag: '🇫🇷', name: 'フランス',     yomi: 'ふらんす',         region: 'ヨーロッパ', level: 1, lat: 46.2, lng: 2.2, iso: 'FRA' },
+  { flag: '🇩🇪', name: 'ドイツ',       yomi: 'どいつ',           region: 'ヨーロッパ', level: 1, lat: 51.2, lng: 10.5, iso: 'DEU' },
+  { flag: '🇮🇹', name: 'イタリア',     yomi: 'いたりあ',         region: 'ヨーロッパ', level: 1, lat: 41.9, lng: 12.6, iso: 'ITA' },
+  { flag: '🇪🇸', name: 'スペイン',     yomi: 'すぺいん',         region: 'ヨーロッパ', level: 1, lat: 40.5, lng: -3.7, iso: 'ESP' },
+  { flag: '🇵🇹', name: 'ポルトガル',   yomi: 'ぽるとがる',       region: 'ヨーロッパ', level: 2, lat: 39.4, lng: -8.2, iso: 'PRT' },
+  { flag: '🇨🇭', name: 'スイス',       yomi: 'すいす',           region: 'ヨーロッパ', level: 2, lat: 46.8, lng: 8.2, iso: 'CHE' },
+  { flag: '🇳🇱', name: 'オランダ',     yomi: 'おらんだ',         region: 'ヨーロッパ', level: 2, lat: 52.1, lng: 5.3, iso: 'NLD' },
+  { flag: '🇸🇪', name: 'スウェーデン', yomi: 'すうぇーでん',     region: 'ヨーロッパ', level: 2, lat: 60.1, lng: 18.6, iso: 'SWE' },
+  { flag: '🇳🇴', name: 'ノルウェー',   yomi: 'のるうぇー',       region: 'ヨーロッパ', level: 2, lat: 60.5, lng: 8.5, iso: 'NOR' },
+  { flag: '🇫🇮', name: 'フィンランド', yomi: 'ふぃんらんど',     region: 'ヨーロッパ', level: 2, lat: 61.9, lng: 25.7, iso: 'FIN' },
+  { flag: '🇩🇰', name: 'デンマーク',   yomi: 'でんまーく',       region: 'ヨーロッパ', level: 2, lat: 56.3, lng: 9.5, iso: 'DNK' },
+  { flag: '🇷🇺', name: 'ロシア',       yomi: 'ろしあ',           region: 'ヨーロッパ', level: 1, lat: 61.5, lng: 105.3, iso: 'RUS' },
+  { flag: '🇬🇷', name: 'ギリシャ',     yomi: 'ぎりしゃ',         region: 'ヨーロッパ', level: 2, lat: 39.1, lng: 21.8, iso: 'GRC' },
+  { flag: '🇹🇷', name: 'トルコ',       yomi: 'とるこ',           region: 'ヨーロッパ', level: 2, lat: 38.9, lng: 35.2, iso: 'TUR' },
+  { flag: '🇵🇱', name: 'ポーランド',   yomi: 'ぽーらんど',       region: 'ヨーロッパ', level: 3, lat: 51.9, lng: 19.1, iso: 'POL' },
+  { flag: '🇺🇦', name: 'ウクライナ',   yomi: 'うくらいな',       region: 'ヨーロッパ', level: 2, lat: 48.4, lng: 31.2, iso: 'UKR' },
+  { flag: '🇺🇸', name: 'アメリカ',     yomi: 'あめりか',         region: '北アメリカ', level: 1, lat: 39.8, lng: -98.6, iso: 'USA' },
+  { flag: '🇨🇦', name: 'カナダ',       yomi: 'かなだ',           region: '北アメリカ', level: 1, lat: 56.1, lng: -106.3, iso: 'CAN' },
+  { flag: '🇲🇽', name: 'メキシコ',     yomi: 'めきしこ',         region: '北アメリカ', level: 2, lat: 23.6, lng: -102.5, iso: 'MEX' },
+  { flag: '🇧🇷', name: 'ブラジル',     yomi: 'ぶらじる',         region: '南アメリカ', level: 1, lat: -14.2, lng: -51.9, iso: 'BRA' },
+  { flag: '🇦🇷', name: 'アルゼンチン', yomi: 'あるぜんちん',     region: '南アメリカ', level: 2, lat: -38.4, lng: -63.6, iso: 'ARG' },
+  { flag: '🇨🇱', name: 'チリ',         yomi: 'ちり',             region: '南アメリカ', level: 3, lat: -35.7, lng: -71.5, iso: 'CHL' },
+  { flag: '🇵🇪', name: 'ペルー',       yomi: 'ぺるー',           region: '南アメリカ', level: 3, lat: -9.2, lng: -75.0, iso: 'PER' },
+  { flag: '🇦🇺', name: 'オーストラリア', yomi: 'おーすとらりあ', region: 'オセアニア', level: 1, lat: -25.3, lng: 133.8, iso: 'AUS' },
+  { flag: '🇳🇿', name: 'ニュージーランド', yomi: 'にゅーじーらんど', region: 'オセアニア', level: 2, lat: -40.9, lng: 174.9, iso: 'NZL' },
+  { flag: '🇪🇬', name: 'エジプト',     yomi: 'えじぷと',         region: 'アフリカ',   level: 1, lat: 26.8, lng: 30.8, iso: 'EGY' },
+  { flag: '🇿🇦', name: '南アフリカ',   yomi: 'みなみあふりか',   region: 'アフリカ',   level: 2, lat: -30.6, lng: 22.9, iso: 'ZAF' },
+  { flag: '🇰🇪', name: 'ケニア',       yomi: 'けにあ',           region: 'アフリカ',   level: 3, lat: -0.02, lng: 37.9, iso: 'KEN' },
+  { flag: '🇲🇦', name: 'モロッコ',     yomi: 'もろっこ',         region: 'アフリカ',   level: 3, lat: 31.8, lng: -7.1, iso: 'MAR' },
+  { flag: '🇳🇬', name: 'ナイジェリア', yomi: 'ないじぇりあ',     region: 'アフリカ',   level: 3, lat: 9.1, lng: 8.7, iso: 'NGA' },
+  { flag: '🇸🇦', name: 'サウジアラビア', yomi: 'さうじあらびあ', region: '中東',       level: 2, lat: 23.9, lng: 45.1, iso: 'SAU' },
+  { flag: '🇦🇪', name: 'アラブ首長国連邦', yomi: 'あらぶしゅちょうこくれんぽう', region: '中東', level: 3, lat: 23.4, lng: 53.8, iso: 'ARE' },
+  { flag: '🇮🇱', name: 'イスラエル',   yomi: 'いすらえる',       region: '中東',       level: 3, lat: 31.0, lng: 34.9, iso: 'ISR' },
+  { flag: '🇮🇷', name: 'イラン',       yomi: 'いらん',           region: '中東',       level: 3, lat: 32.4, lng: 53.7, iso: 'IRN' },
 ];
+
+// 世界の国境GeoJSON(一度だけ読み込み、以降キャッシュ)
+let worldGeoJSON = null;
+const GEOJSON_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
+
+async function loadGeoJSON() {
+  if (worldGeoJSON) return worldGeoJSON;
+  try {
+    const res = await fetch(GEOJSON_URL);
+    worldGeoJSON = await res.json();
+    return worldGeoJSON;
+  } catch (e) {
+    console.error('GeoJSON load failed:', e);
+    return null;
+  }
+}
+
+// 起動時にバックグラウンドで先読み
+loadGeoJSON();
 
 let state = {
   mode: null, pool: [], current: null, choices: [],
@@ -225,7 +262,7 @@ function showStart() {
   destroyMap();
   panel.innerHTML = `
     <div class="start-screen">
-      <p>こっきを みて くにの なまえを あてよう!<br>こたえたら ちずで ばしょも わかるよ 🗺️</p>
+      <p>こっきを みて くにの なまえを あてよう!<br>こたえたら ちずで くにを いろで みせるよ 🗺️</p>
       <button class="mode-btn mode-easy" onclick="startGame('easy')">
         🟢 かんたん
         <div class="mode-desc">4つから えらぶ ・ ゆうめいな くに 20こ</div>
@@ -306,6 +343,7 @@ function renderQuestion() {
     <div class="flag-display">${state.current.flag}</div>
     ${choicesHTML}
     <div id="feedback-area"></div>
+    <button class="quit-btn" onclick="confirmQuit()">🏠 やめて さいしょに もどる</button>
   `;
 
   if (state.mode === 'hard') {
@@ -363,6 +401,7 @@ function handleAnswer(isCorrect, userAnswer) {
     </div>
     <div class="map-container">
       <div id="map"></div>
+      <div id="map-loading" class="map-loading">ちず よみこみちゅう...</div>
       <div class="map-info">📍 ${state.current.flag} ${state.current.name} は ここに あるよ!</div>
     </div>
     <button class="next-btn" onclick="nextQuestion()">
@@ -373,7 +412,7 @@ function handleAnswer(isCorrect, userAnswer) {
   setTimeout(() => initMap('world'), 100);
 }
 
-function initMap(mode) {
+async function initMap(mode) {
   if (mapInstance) { mapInstance.remove(); mapInstance = null; }
   const c = state.current;
   const zoom = mode === 'world' ? 2 : 4;
@@ -385,24 +424,61 @@ function initMap(mode) {
     worldCopyJump: true,
   }).setView(center, zoom);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // 薄いベースマップ(国土の色を目立たせるため淡い色のタイル)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
     maxZoom: 10,
+    subdomains: 'abcd',
   }).addTo(mapInstance);
 
+  // GeoJSON読み込み(キャッシュ済みなら即反映)
+  const geo = await loadGeoJSON();
+  const loadingEl = document.getElementById('map-loading');
+
+  if (geo && geo.features) {
+    // 正解国のポリゴンを探す(ISO_A3コードで照合)
+    const countryFeature = geo.features.find(f => {
+      const props = f.properties || {};
+      return props.ISO_A3 === c.iso || props.iso_a3 === c.iso || props.ADM0_A3 === c.iso;
+    });
+
+    if (countryFeature) {
+      // 国土を鮮やかに塗りつぶす
+      const countryLayer = L.geoJSON(countryFeature, {
+        style: {
+          color: '#dc2626',        // 外枠:赤
+          weight: 3,
+          opacity: 1,
+          fillColor: '#f59e0b',    // 塗り:オレンジ(目立つ)
+          fillOpacity: 0.75,
+        }
+      }).addTo(mapInstance);
+
+      // ズームモード時は国の境界に自動フィット
+      if (mode === 'zoom') {
+        mapInstance.fitBounds(countryLayer.getBounds(), { padding: [20, 20], maxZoom: 6 });
+      }
+    }
+
+    if (loadingEl) loadingEl.remove();
+  } else {
+    // GeoJSON読み込み失敗時のフォールバック(円で表示)
+    L.circle([c.lat, c.lng], {
+      color: '#dc2626',
+      fillColor: '#f59e0b',
+      fillOpacity: 0.6,
+      radius: mode === 'world' ? 500000 : 200000,
+    }).addTo(mapInstance);
+    if (loadingEl) loadingEl.remove();
+  }
+
+  // 国旗ラベル(中心に表示)
   const flagIcon = L.divIcon({
-    className: 'flag-marker',
+    className: 'flag-label',
     html: c.flag,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
   });
-  L.marker([c.lat, c.lng], { icon: flagIcon }).addTo(mapInstance);
-
-  L.circle([c.lat, c.lng], {
-    color: '#ef4444',
-    fillColor: '#fca5a5',
-    fillOpacity: 0.4,
-    radius: mode === 'world' ? 500000 : 200000,
-  }).addTo(mapInstance);
+  L.marker([c.lat, c.lng], { icon: flagIcon, interactive: false }).addTo(mapInstance);
 }
 
 function switchMap(mode) {
@@ -413,6 +489,12 @@ function switchMap(mode) {
 
 function destroyMap() {
   if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+}
+
+function confirmQuit() {
+  if (confirm('ゲームを やめて さいしょに もどりますか?')) {
+    showStart();
+  }
 }
 
 function showResult() {
