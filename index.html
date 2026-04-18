@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>せかいの こっき クイズ 🌍</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Maru Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fbbf24 100%);
+    min-height: 100vh;
+    padding: 16px;
+    display: flex; justify-content: center; align-items: flex-start;
+  }
+  .app { width: 100%; max-width: 560px; }
+  h1 {
+    text-align: center; font-size: 28px; color: #1e3a8a;
+    margin-bottom: 12px; text-shadow: 2px 2px 0 #fff;
+  }
+  .panel {
+    background: #fff; border-radius: 24px; padding: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border: 4px solid #1e3a8a;
+  }
+  .start-screen { text-align: center; }
+  .start-screen p { font-size: 16px; color: #475569; margin: 8px 0 20px; }
+  .mode-btn {
+    display: block; width: 100%; padding: 18px;
+    margin: 10px 0; border: none; border-radius: 16px;
+    font-size: 20px; font-weight: bold; cursor: pointer;
+    transition: transform 0.1s;
+    color: #fff; font-family: inherit;
+  }
+  .mode-btn:active { transform: scale(0.97); }
+  .mode-easy { background: #22c55e; box-shadow: 0 4px 0 #15803d; }
+  .mode-normal { background: #3b82f6; box-shadow: 0 4px 0 #1d4ed8; }
+  .mode-hard { background: #ef4444; box-shadow: 0 4px 0 #b91c1c; }
+  .mode-desc { font-size: 13px; opacity: 0.9; margin-top: 4px; font-weight: normal; }
+
+  .header-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px; font-size: 14px; color: #475569;
+  }
+  .score-box { background: #1e3a8a; color: #fff; padding: 6px 14px; border-radius: 20px; font-weight: bold; }
+  .streak-box { background: #f59e0b; color: #fff; padding: 6px 14px; border-radius: 20px; font-weight: bold; }
+  .question { text-align: center; margin-bottom: 16px; }
+  .question .label { font-size: 14px; color: #64748b; margin-bottom: 6px; }
+  .question .region { display: inline-block; background: #ddd6fe; color: #5b21b6; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; }
+  .flag-display {
+    font-size: 120px; text-align: center; line-height: 1;
+    background: #f1f5f9; border-radius: 16px; padding: 20px 0; margin-bottom: 20px;
+    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  }
+  .choices { display: grid; gap: 10px; }
+  .choice-btn {
+    padding: 14px; border: 3px solid #cbd5e1; background: #fff; border-radius: 14px;
+    font-size: 17px; font-weight: bold; cursor: pointer;
+    color: #1e293b; text-align: left; transition: all 0.15s; font-family: inherit;
+  }
+  .choice-btn:hover { border-color: #3b82f6; background: #eff6ff; }
+  .choice-btn:active { transform: scale(0.98); }
+  .choice-btn .yomi { font-size: 12px; color: #64748b; font-weight: normal; display: block; margin-top: 2px; }
+  .choice-btn.correct { background: #22c55e; color: #fff; border-color: #15803d; }
+  .choice-btn.correct .yomi { color: #dcfce7; }
+  .choice-btn.wrong { background: #ef4444; color: #fff; border-color: #b91c1c; }
+  .choice-btn.wrong .yomi { color: #fee2e2; }
+  .choice-btn:disabled { cursor: default; }
+
+  .typing-area { text-align: center; }
+  .typing-area input {
+    width: 100%; padding: 14px; font-size: 18px;
+    border: 3px solid #cbd5e1; border-radius: 12px;
+    text-align: center; font-family: inherit;
+  }
+  .typing-area input:focus { outline: none; border-color: #3b82f6; }
+  .hint { background: #fef3c7; padding: 10px; border-radius: 10px; margin: 12px 0; font-size: 14px; color: #92400e; }
+  .submit-btn {
+    background: #3b82f6; color: #fff; border: none;
+    padding: 14px 28px; border-radius: 12px;
+    font-size: 16px; font-weight: bold; cursor: pointer;
+    margin-top: 12px; box-shadow: 0 4px 0 #1d4ed8; font-family: inherit;
+  }
+  .submit-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #1d4ed8; }
+
+  .feedback {
+    text-align: center; padding: 16px; border-radius: 14px;
+    margin-top: 16px; font-size: 18px; font-weight: bold;
+    animation: pop 0.3s ease-out;
+  }
+  @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .feedback.ok { background: #dcfce7; color: #15803d; }
+  .feedback.ng { background: #fee2e2; color: #b91c1c; }
+  .feedback .answer { font-size: 24px; margin-top: 8px; }
+
+  .map-container {
+    margin-top: 12px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 3px solid #1e3a8a;
+    background: #e0f2fe;
+  }
+  #map { width: 100%; height: 280px; }
+  .map-info {
+    background: #1e3a8a; color: #fff; padding: 8px 12px;
+    font-size: 13px; text-align: center;
+  }
+  .map-tabs {
+    display: flex; margin-top: 10px; gap: 6px;
+  }
+  .map-tab {
+    flex: 1; padding: 8px; border: 2px solid #1e3a8a;
+    background: #fff; color: #1e3a8a;
+    border-radius: 10px; font-weight: bold; cursor: pointer;
+    font-family: inherit; font-size: 13px;
+  }
+  .map-tab.active { background: #1e3a8a; color: #fff; }
+
+  .next-btn {
+    display: block; width: 100%; padding: 14px; margin-top: 12px;
+    background: #1e3a8a; color: #fff; border: none;
+    border-radius: 12px; font-size: 17px; font-weight: bold;
+    cursor: pointer; box-shadow: 0 4px 0 #0f172a; font-family: inherit;
+  }
+  .next-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0f172a; }
+
+  .result { text-align: center; }
+  .result h2 { color: #1e3a8a; font-size: 24px; margin-bottom: 12px; }
+  .result .big-score { font-size: 56px; color: #f59e0b; font-weight: bold; margin: 12px 0; }
+  .result .comment { font-size: 18px; color: #475569; margin-bottom: 20px; }
+  .learned-list {
+    background: #f8fafc; border-radius: 12px; padding: 12px;
+    margin-top: 16px; max-height: 200px; overflow-y: auto;
+  }
+  .learned-list h3 { font-size: 14px; color: #475569; margin-bottom: 8px; }
+  .learned-item {
+    display: flex; justify-content: space-between; padding: 6px 0;
+    border-bottom: 1px solid #e2e8f0; font-size: 14px;
+  }
+  .learned-item:last-child { border-bottom: none; }
+
+  .flag-marker {
+    font-size: 32px; text-align: center; line-height: 1;
+    text-shadow: 0 0 8px #fff, 0 0 4px #fff;
+    background: transparent !important; border: none !important;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🌍 せかいの こっき クイズ 🚩</h1>
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+const COUNTRIES = [
+  { flag: '🇯🇵', name: '日本',         yomi: 'にほん',           region: 'アジア',     level: 1, lat: 36.2, lng: 138.3 },
+  { flag: '🇰🇷', name: '韓国',         yomi: 'かんこく',         region: 'アジア',     level: 1, lat: 35.9, lng: 127.8 },
+  { flag: '🇨🇳', name: '中国',         yomi: 'ちゅうごく',       region: 'アジア',     level: 1, lat: 35.9, lng: 104.2 },
+  { flag: '🇲🇾', name: 'マレーシア',   yomi: 'まれーしあ',       region: 'アジア',     level: 1, lat: 4.2, lng: 101.9 },
+  { flag: '🇸🇬', name: 'シンガポール', yomi: 'しんがぽーる',     region: 'アジア',     level: 2, lat: 1.35, lng: 103.8 },
+  { flag: '🇹🇭', name: 'タイ',         yomi: 'たい',             region: 'アジア',     level: 2, lat: 15.9, lng: 101.0 },
+  { flag: '🇮🇳', name: 'インド',       yomi: 'いんど',           region: 'アジア',     level: 1, lat: 20.6, lng: 78.9 },
+  { flag: '🇮🇩', name: 'インドネシア', yomi: 'いんどねしあ',     region: 'アジア',     level: 2, lat: -0.8, lng: 113.9 },
+  { flag: '🇻🇳', name: 'ベトナム',     yomi: 'べとなむ',         region: 'アジア',     level: 2, lat: 14.1, lng: 108.3 },
+  { flag: '🇵🇭', name: 'フィリピン',   yomi: 'ふぃりぴん',       region: 'アジア',     level: 2, lat: 12.9, lng: 121.8 },
+  { flag: '🇬🇧', name: 'イギリス',     yomi: 'いぎりす',         region: 'ヨーロッパ', level: 1, lat: 55.4, lng: -3.4 },
+  { flag: '🇫🇷', name: 'フランス',     yomi: 'ふらんす',         region: 'ヨーロッパ', level: 1, lat: 46.2, lng: 2.2 },
+  { flag: '🇩🇪', name: 'ドイツ',       yomi: 'どいつ',           region: 'ヨーロッパ', level: 1, lat: 51.2, lng: 10.5 },
+  { flag: '🇮🇹', name: 'イタリア',     yomi: 'いたりあ',         region: 'ヨーロッパ', level: 1, lat: 41.9, lng: 12.6 },
+  { flag: '🇪🇸', name: 'スペイン',     yomi: 'すぺいん',         region: 'ヨーロッパ', level: 1, lat: 40.5, lng: -3.7 },
+  { flag: '🇵🇹', name: 'ポルトガル',   yomi: 'ぽるとがる',       region: 'ヨーロッパ', level: 2, lat: 39.4, lng: -8.2 },
+  { flag: '🇨🇭', name: 'スイス',       yomi: 'すいす',           region: 'ヨーロッパ', level: 2, lat: 46.8, lng: 8.2 },
+  { flag: '🇳🇱', name: 'オランダ',     yomi: 'おらんだ',         region: 'ヨーロッパ', level: 2, lat: 52.1, lng: 5.3 },
+  { flag: '🇸🇪', name: 'スウェーデン', yomi: 'すうぇーでん',     region: 'ヨーロッパ', level: 2, lat: 60.1, lng: 18.6 },
+  { flag: '🇳🇴', name: 'ノルウェー',   yomi: 'のるうぇー',       region: 'ヨーロッパ', level: 2, lat: 60.5, lng: 8.5 },
+  { flag: '🇫🇮', name: 'フィンランド', yomi: 'ふぃんらんど',     region: 'ヨーロッパ', level: 2, lat: 61.9, lng: 25.7 },
+  { flag: '🇩🇰', name: 'デンマーク',   yomi: 'でんまーく',       region: 'ヨーロッパ', level: 2, lat: 56.3, lng: 9.5 },
+  { flag: '🇷🇺', name: 'ロシア',       yomi: 'ろしあ',           region: 'ヨーロッパ', level: 1, lat: 61.5, lng: 105.3 },
+  { flag: '🇬🇷', name: 'ギリシャ',     yomi: 'ぎりしゃ',         region: 'ヨーロッパ', level: 2, lat: 39.1, lng: 21.8 },
+  { flag: '🇹🇷', name: 'トルコ',       yomi: 'とるこ',           region: 'ヨーロッパ', level: 2, lat: 38.9, lng: 35.2 },
+  { flag: '🇵🇱', name: 'ポーランド',   yomi: 'ぽーらんど',       region: 'ヨーロッパ', level: 3, lat: 51.9, lng: 19.1 },
+  { flag: '🇺🇦', name: 'ウクライナ',   yomi: 'うくらいな',       region: 'ヨーロッパ', level: 2, lat: 48.4, lng: 31.2 },
+  { flag: '🇺🇸', name: 'アメリカ',     yomi: 'あめりか',         region: '北アメリカ', level: 1, lat: 39.8, lng: -98.6 },
+  { flag: '🇨🇦', name: 'カナダ',       yomi: 'かなだ',           region: '北アメリカ', level: 1, lat: 56.1, lng: -106.3 },
+  { flag: '🇲🇽', name: 'メキシコ',     yomi: 'めきしこ',         region: '北アメリカ', level: 2, lat: 23.6, lng: -102.5 },
+  { flag: '🇧🇷', name: 'ブラジル',     yomi: 'ぶらじる',         region: '南アメリカ', level: 1, lat: -14.2, lng: -51.9 },
+  { flag: '🇦🇷', name: 'アルゼンチン', yomi: 'あるぜんちん',     region: '南アメリカ', level: 2, lat: -38.4, lng: -63.6 },
+  { flag: '🇨🇱', name: 'チリ',         yomi: 'ちり',             region: '南アメリカ', level: 3, lat: -35.7, lng: -71.5 },
+  { flag: '🇵🇪', name: 'ペルー',       yomi: 'ぺるー',           region: '南アメリカ', level: 3, lat: -9.2, lng: -75.0 },
+  { flag: '🇦🇺', name: 'オーストラリア', yomi: 'おーすとらりあ', region: 'オセアニア', level: 1, lat: -25.3, lng: 133.8 },
+  { flag: '🇳🇿', name: 'ニュージーランド', yomi: 'にゅーじーらんど', region: 'オセアニア', level: 2, lat: -40.9, lng: 174.9 },
+  { flag: '🇪🇬', name: 'エジプト',     yomi: 'えじぷと',         region: 'アフリカ',   level: 1, lat: 26.8, lng: 30.8 },
+  { flag: '🇿🇦', name: '南アフリカ',   yomi: 'みなみあふりか',   region: 'アフリカ',   level: 2, lat: -30.6, lng: 22.9 },
+  { flag: '🇰🇪', name: 'ケニア',       yomi: 'けにあ',           region: 'アフリカ',   level: 3, lat: -0.02, lng: 37.9 },
+  { flag: '🇲🇦', name: 'モロッコ',     yomi: 'もろっこ',         region: 'アフリカ',   level: 3, lat: 31.8, lng: -7.1 },
+  { flag: '🇳🇬', name: 'ナイジェリア', yomi: 'ないじぇりあ',     region: 'アフリカ',   level: 3, lat: 9.1, lng: 8.7 },
+  { flag: '🇸🇦', name: 'サウジアラビア', yomi: 'さうじあらびあ', region: '中東',       level: 2, lat: 23.9, lng: 45.1 },
+  { flag: '🇦🇪', name: 'アラブ首長国連邦', yomi: 'あらぶしゅちょうこくれんぽう', region: '中東', level: 3, lat: 23.4, lng: 53.8 },
+  { flag: '🇮🇱', name: 'イスラエル',   yomi: 'いすらえる',       region: '中東',       level: 3, lat: 31.0, lng: 34.9 },
+  { flag: '🇮🇷', name: 'イラン',       yomi: 'いらん',           region: '中東',       level: 3, lat: 32.4, lng: 53.7 },
+];
+
+let state = {
+  mode: null, pool: [], current: null, choices: [],
+  questionNum: 0, totalQuestions: 10,
+  score: 0, streak: 0, maxStreak: 0,
+  learned: [], answered: false,
+};
+let mapInstance = null;
+const panel = document.getElementById('panel');
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function showStart() {
+  destroyMap();
+  panel.innerHTML = `
+    <div class="start-screen">
+      <p>こっきを みて くにの なまえを あてよう!<br>こたえたら ちずで ばしょも わかるよ 🗺️</p>
+      <button class="mode-btn mode-easy" onclick="startGame('easy')">
+        🟢 かんたん
+        <div class="mode-desc">4つから えらぶ ・ ゆうめいな くに 20こ</div>
+      </button>
+      <button class="mode-btn mode-normal" onclick="startGame('normal')">
+        🔵 ふつう
+        <div class="mode-desc">6つから えらぶ ・ ぜんぶの くに</div>
+      </button>
+      <button class="mode-btn mode-hard" onclick="startGame('hard')">
+        🔴 むずかしい
+        <div class="mode-desc">なまえを にゅうりょく ・ ヒントあり</div>
+      </button>
+    </div>
+  `;
+}
+
+function startGame(mode) {
+  state.mode = mode;
+  state.score = 0; state.streak = 0; state.maxStreak = 0;
+  state.questionNum = 0; state.learned = [];
+  state.totalQuestions = 10;
+  if (mode === 'easy')      state.pool = shuffle(COUNTRIES.filter(c => c.level === 1));
+  else if (mode === 'normal') state.pool = shuffle(COUNTRIES.filter(c => c.level <= 2));
+  else                        state.pool = shuffle(COUNTRIES);
+  nextQuestion();
+}
+
+function nextQuestion() {
+  destroyMap();
+  if (state.questionNum >= state.totalQuestions) { showResult(); return; }
+  state.questionNum++;
+  state.answered = false;
+  state.current = state.pool[state.questionNum - 1] || COUNTRIES[Math.floor(Math.random()*COUNTRIES.length)];
+  if (state.mode !== 'hard') {
+    const numChoices = state.mode === 'easy' ? 4 : 6;
+    const sameRegion = COUNTRIES.filter(c => c.region === state.current.region && c.name !== state.current.name);
+    const others = COUNTRIES.filter(c => c.name !== state.current.name && c.region !== state.current.region);
+    const dummies = shuffle(sameRegion).slice(0, Math.min(2, numChoices - 1))
+      .concat(shuffle(others).slice(0, numChoices - 1));
+    state.choices = shuffle([state.current, ...dummies.slice(0, numChoices - 1)]);
+  }
+  renderQuestion();
+}
+
+function renderQuestion() {
+  let choicesHTML = '';
+  if (state.mode === 'hard') {
+    const hint = state.current.yomi.length > 3
+      ? state.current.yomi[0] + '○'.repeat(state.current.yomi.length - 2) + state.current.yomi.slice(-1)
+      : state.current.yomi[0] + '○'.repeat(state.current.yomi.length - 1);
+    choicesHTML = `
+      <div class="typing-area">
+        <div class="hint">💡 ヒント: ${hint} (${state.current.yomi.length}もじ)</div>
+        <input type="text" id="answerInput" placeholder="ひらがなで にゅうりょく" autocomplete="off">
+        <button class="submit-btn" onclick="submitTyping()">こたえる ✏️</button>
+      </div>
+    `;
+  } else {
+    choicesHTML = `<div class="choices">` +
+      state.choices.map(c => `
+        <button class="choice-btn" onclick="selectAnswer('${c.name}')">
+          ${c.name}
+          <span class="yomi">${c.yomi}</span>
+        </button>
+      `).join('') + `</div>`;
+  }
+
+  panel.innerHTML = `
+    <div class="header-row">
+      <span>もんだい ${state.questionNum} / ${state.totalQuestions}</span>
+      <span class="streak-box">🔥 ${state.streak}</span>
+      <span class="score-box">⭐ ${state.score}</span>
+    </div>
+    <div class="question">
+      <div class="label">この くにの なまえは?</div>
+      <span class="region">📍 ${state.current.region}</span>
+    </div>
+    <div class="flag-display">${state.current.flag}</div>
+    ${choicesHTML}
+    <div id="feedback-area"></div>
+  `;
+
+  if (state.mode === 'hard') {
+    const input = document.getElementById('answerInput');
+    input.focus();
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitTyping(); });
+  }
+}
+
+function selectAnswer(name) {
+  if (state.answered) return;
+  state.answered = true;
+  const isCorrect = name === state.current.name;
+  handleAnswer(isCorrect, name);
+  document.querySelectorAll('.choice-btn').forEach(btn => {
+    btn.disabled = true;
+    const btnName = btn.textContent.trim().split('\n')[0].trim();
+    if (btnName === state.current.name) btn.classList.add('correct');
+    else if (btnName === name && !isCorrect) btn.classList.add('wrong');
+  });
+}
+
+function submitTyping() {
+  if (state.answered) return;
+  const input = document.getElementById('answerInput');
+  const ans = input.value.trim();
+  if (!ans) return;
+  state.answered = true;
+  const isCorrect = ans === state.current.yomi || ans === state.current.name;
+  handleAnswer(isCorrect, ans);
+  input.disabled = true;
+}
+
+function handleAnswer(isCorrect, userAnswer) {
+  if (isCorrect) {
+    state.score += (state.mode === 'hard' ? 20 : state.mode === 'normal' ? 15 : 10);
+    state.streak++;
+    if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+    if (state.streak >= 3 && state.streak % 3 === 0) state.score += 10;
+  } else {
+    state.streak = 0;
+  }
+  state.learned.push({ ...state.current, correct: isCorrect });
+
+  const fb = document.getElementById('feedback-area');
+  fb.innerHTML = `
+    <div class="feedback ${isCorrect ? 'ok' : 'ng'}">
+      ${isCorrect ? '🎉 せいかい!' : '😢 ざんねん...'}
+      <div class="answer">${state.current.flag} ${state.current.name} (${state.current.yomi})</div>
+      ${isCorrect && state.streak >= 3 && state.streak % 3 === 0 ? '<div style="margin-top:8px;font-size:14px;">🔥 ' + state.streak + 'れんぞく! ボーナス +10</div>' : ''}
+    </div>
+    <div class="map-tabs">
+      <button class="map-tab active" id="tab-world" onclick="switchMap('world')">🌍 せかいちず</button>
+      <button class="map-tab" id="tab-zoom" onclick="switchMap('zoom')">🔍 ちかくを みる</button>
+    </div>
+    <div class="map-container">
+      <div id="map"></div>
+      <div class="map-info">📍 ${state.current.flag} ${state.current.name} は ここに あるよ!</div>
+    </div>
+    <button class="next-btn" onclick="nextQuestion()">
+      ${state.questionNum >= state.totalQuestions ? 'けっかを みる 🏆' : 'つぎの もんだい ➡️'}
+    </button>
+  `;
+
+  setTimeout(() => initMap('world'), 100);
+}
+
+function initMap(mode) {
+  if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+  const c = state.current;
+  const zoom = mode === 'world' ? 2 : 4;
+  const center = mode === 'world' ? [20, c.lng] : [c.lat, c.lng];
+
+  mapInstance = L.map('map', {
+    zoomControl: true,
+    attributionControl: false,
+    worldCopyJump: true,
+  }).setView(center, zoom);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 10,
+  }).addTo(mapInstance);
+
+  const flagIcon = L.divIcon({
+    className: 'flag-marker',
+    html: c.flag,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+  });
+  L.marker([c.lat, c.lng], { icon: flagIcon }).addTo(mapInstance);
+
+  L.circle([c.lat, c.lng], {
+    color: '#ef4444',
+    fillColor: '#fca5a5',
+    fillOpacity: 0.4,
+    radius: mode === 'world' ? 500000 : 200000,
+  }).addTo(mapInstance);
+}
+
+function switchMap(mode) {
+  document.getElementById('tab-world').classList.toggle('active', mode === 'world');
+  document.getElementById('tab-zoom').classList.toggle('active', mode === 'zoom');
+  initMap(mode);
+}
+
+function destroyMap() {
+  if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+}
+
+function showResult() {
+  destroyMap();
+  const max = state.totalQuestions * (state.mode === 'hard' ? 20 : state.mode === 'normal' ? 15 : 10);
+  const pct = Math.round(state.score / max * 100);
+  let comment, emoji;
+  if (pct >= 90) { comment = 'すごい! はかせレベル!'; emoji = '🏆'; }
+  else if (pct >= 70) { comment = 'よく できました!'; emoji = '🥇'; }
+  else if (pct >= 50) { comment = 'がんばったね!'; emoji = '🥈'; }
+  else { comment = 'もう いちど ちょうせん してみよう!'; emoji = '💪'; }
+
+  const wrongOnes = state.learned.filter(l => !l.correct);
+  const learnedHTML = wrongOnes.length > 0 ? `
+    <div class="learned-list">
+      <h3>📚 おぼえようリスト (まちがえた くに)</h3>
+      ${wrongOnes.map(l => `
+        <div class="learned-item">
+          <span>${l.flag} ${l.name}</span>
+          <span style="color:#64748b;">${l.yomi}</span>
+        </div>
+      `).join('')}
+    </div>
+  ` : '<div class="learned-list"><h3>🌟 ぜんぶ せいかい! すごい!</h3></div>';
+
+  panel.innerHTML = `
+    <div class="result">
+      <h2>${emoji} けっか はっぴょう!</h2>
+      <div class="big-score">${state.score}てん</div>
+      <div class="comment">${comment}</div>
+      <div style="background:#f1f5f9;padding:12px;border-radius:12px;margin:12px 0;">
+        🔥 さいだい れんぞく せいかい: <b>${state.maxStreak}かい</b>
+      </div>
+      ${learnedHTML}
+      <button class="next-btn" onclick="showStart()" style="margin-top:20px;">
+        🏠 さいしょに もどる
+      </button>
+    </div>
+  `;
+}
+
+showStart();
+</script>
+</body>
+</html>
